@@ -1,67 +1,93 @@
 #!/usr/bin/env python3
-""" Unittests and integration tests module.
+""" Test utils
 """
 import unittest
+from unittest.mock import patch
+import requests
 from utils import access_nested_map, get_json, memoize
-from parameterized import parameterized, param
-from unittest.mock import patch, Mock
+from parameterized import parameterized, parameterized_class
 
 
 class TestAccessNestedMap(unittest.TestCase):
-    """ Class for nested map access test.
-    """
-    @parameterized.expand([
-        param(1, nested_map={"a": 1}, path=("a",)),
-        param({"b": 2}, nested_map={"a": {"b": 2}}, path=("a",)),
-        param(2, nested_map={"a": {"b": 2}}, path=("a", "b"))
-    ])
-    def test_access_nested_map(self, expected, nested_map, path):
-        """ Method that test access nested map
-            and returns what it is supposed to.
-        """
-        self.assertEqual(access_nested_map(nested_map, path), expected)
+    """ Access nested map """
 
     @parameterized.expand([
-        param(KeyError, nested_map={}, path=("a",)),
-        param(KeyError, nested_map={"a": 1}, path=("a", "b"))
+        ({"a": 1}, ("a",), 1),
+        ({"a": {"b": 2}}, ("a",), {"b": 2}),
+        ({"a": {"b": 2}}, ("a", "b"), 2)
     ])
-    def test_access_nested_map_exception(self, expected, nested_map, path):
-        """ Method that test acces nested map exception.
+    def test_access_nested_map(self, nested_map, path_map, result_expec):
+        """ Access nested method
+
+            args:
+                nested_map: {"a": 1},
+                path: ("a",)
+                result_expec: 1
+
+            return
+                Ok if its correct
         """
-        with self.assertRaises(expected):
-            access_nested_map(nested_map, path)
+        self.assertEqual(access_nested_map(nested_map, path_map), result_expec)
+
+    @parameterized.expand([
+        ({}, ("a",)),
+        ({"a": 1}, ("a", "b"))
+    ])
+    def test_access_nested_map_exception(self, nested_map, path_map):
+        """ Exception access nested method
+
+            args:
+                nested_map: {}
+                path: ("a",)
+
+            return:
+                ok if its correct
+        """
+        with self.assertRaises(KeyError) as error:
+            access_nested_map(nested_map, path_map)
+
+        self.assertEqual(
+            f'KeyError({str(error.exception)})', repr(error.exception))
 
 
 class TestGetJson(unittest.TestCase):
-    """ Class for test get Json.
-    """
+    """ Test JSON """
 
     @parameterized.expand([
-        param(test_url="http://example.com", test_payload={"payload": True}),
-        param(test_url="http://holberton.io", test_payload={"payload": False})
+        ("http://example.com", {"payload": True}),
+        ("http://holberton.io", {"payload": False})
     ])
     def test_get_json(self, test_url, test_payload):
-        """ Returns a Mock object with a json method.
+        """ Mock HTTP calls
+
+            args:
+                url: Web page to look
+                response: result of the consult
         """
-        with unittest.mock.patch("utils.requests.get"):
-            self.assertEqual(get_json(test_url), test_payload)
+        with patch('requests.get') as mock_request:
+            mock_request.return_value.json.return_value = test_payload
+            self.assertEqual(get_json(url=test_url), test_payload)
 
 
 class TestMemoize(unittest.TestCase):
-    """ TestMemoize class.
-    """
+    """ Test Class to memoize """
 
     def test_memoize(self):
-        """ Method that test memoize """
-
+        """ Test memoize """
         class TestClass:
-            """ TestClass """
+            """ Test Class """
 
             def a_method(self):
-                """ Method """
+                """ A method """
                 return 42
 
             @memoize
             def a_property(self):
-                """ Property """
+                """ Decorator """
                 return self.a_method()
+
+        with patch.object(TestClass, 'a_method') as mock:
+            test_class = TestClass()
+            test_class.a_property()
+            test_class.a_property()
+            mock.assert_called_once()
